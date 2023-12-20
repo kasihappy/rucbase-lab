@@ -18,7 +18,7 @@ See the Mulan PSL v2 for more details. */
 class SortExecutor : public AbstractExecutor {
    private:
     std::unique_ptr<AbstractExecutor> prev_;
-    ColMeta cols_;                              // 框架中只支持一个键排序，需要自行修改数据结构支持多个键排序
+    ColMeta cols_;  // 框架中只支持一个键排序，需要自行修改数据结构支持多个键排序
     size_t tuple_num;
     bool is_desc_;
     std::vector<size_t> used_tuple;
@@ -33,17 +33,16 @@ class SortExecutor : public AbstractExecutor {
         used_tuple.clear();
     }
 
-    void beginTuple() override { 
-        
-    }
+    void beginTuple() override {}
 
     void nextTuple() override {
-        
+        // if (prev_->is_end()) {
+        //     return;
+        // }
+        // prev_->nextTuple();
     }
 
-    std::unique_ptr<RmRecord> Next() override {
-        return nullptr;
-    }
+    std::unique_ptr<RmRecord> Next() override { return nullptr; }
 
     Rid &rid() override { return _abstract_rid; }
 };
