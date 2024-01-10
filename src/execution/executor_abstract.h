@@ -74,5 +74,51 @@ class AbstractExecutor {
         }
         return rec_dict;
     }
+    bool condCheck(const RmRecord *l_record, const std::vector<Condition>& conds_, const std::vector<ColMeta>& cols_) {
+        char *l_val_buf, *r_val_buf;
+        const RmRecord *r_record;
+
+        for (auto &condition : conds_) {  // 条件判断
+            CompOp op = condition.op;
+            int cmp;
+
+            // record和col确定数据位置
+            auto l_col = get_col(cols_, condition.lhs_col);  // 左列元数据
+            l_val_buf = l_record->data + l_col->offset;      // 确定左数据起点
+
+            if (condition.is_rhs_val) {  // 值
+                r_record = condition.rhs_val.raw.get();
+                r_val_buf = r_record->data;
+
+                cmp = ix_compare(l_val_buf, r_val_buf, condition.rhs_val.type, l_col->len);
+            } else {  // 列
+                auto r_col = get_col(cols_, condition.rhs_col);
+                r_val_buf = l_record->data + r_col->offset;
+
+                cmp = ix_compare(l_val_buf, r_val_buf, r_col->type, l_col->len);
+            }
+            if (!op_compare(op, cmp))  // 不满足条件
+                return false;
+        }
+        return true;
+    }
+    static bool op_compare(CompOp op, int cmp) {
+        if (op == OP_EQ) {
+            return cmp == 0;
+        } else if (op == OP_NE) {
+            return cmp != 0;
+        } else if (op == OP_LT) {
+            return cmp < 0;
+        } else if (op == OP_GT) {
+            return cmp > 0;
+        } else if (op == OP_LE) {
+            return cmp <= 0;
+        } else if (op == OP_GE) {
+            return cmp >= 0;
+        } else {
+            throw InternalError("Invalid CompOp");
+        }
+    }
     virtual void feed(const std::map<TabCol, Value> &feed_dict){};
 };
+

@@ -50,8 +50,7 @@ class UpdateExecutor : public AbstractExecutor {
                 memcpy(rec->data + lhs_col->offset, set_clause.rhs.raw->data, lhs_col->len);
             }
             // Remove old entry from index
-            for (size_t i = 0; i < tab_.indexes.size(); ++i) {
-                auto &index = tab_.indexes[i];
+            for (auto & index : tab_.indexes) {
                 auto ih =
                     sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
                 char *key = new char[index.col_tot_len];
@@ -65,8 +64,7 @@ class UpdateExecutor : public AbstractExecutor {
             // Update record in record file
             fh_->update_record(rid, rec->data, context_);
             // Insert new index into index
-            for (size_t i = 0; i < tab_.indexes.size(); ++i) {
-                auto &index = tab_.indexes[i];
+            for (auto & index : tab_.indexes) {
                 auto ih =
                     sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
                 char *key = new char[index.col_tot_len];

@@ -18,7 +18,6 @@ See the Mulan PSL v2 for more details. */
  * @param {int} tab_fd
  */
 bool LockManager::lock_shared_on_record(Transaction* txn, const Rid& rid, int tab_fd) {
-    
     return true;
 }
 
@@ -30,7 +29,6 @@ bool LockManager::lock_shared_on_record(Transaction* txn, const Rid& rid, int ta
  * @param {int} tab_fd 记录所在的表的fd
  */
 bool LockManager::lock_exclusive_on_record(Transaction* txn, const Rid& rid, int tab_fd) {
-
     return true;
 }
 
@@ -41,8 +39,7 @@ bool LockManager::lock_exclusive_on_record(Transaction* txn, const Rid& rid, int
  * @param {int} tab_fd 目标表的fd
  */
 bool LockManager::lock_shared_on_table(Transaction* txn, int tab_fd) {
-    
-    return true;
+    return addLockOnTable(txn, tab_fd, 1);
 }
 
 /**
@@ -52,8 +49,7 @@ bool LockManager::lock_shared_on_table(Transaction* txn, int tab_fd) {
  * @param {int} tab_fd 目标表的fd
  */
 bool LockManager::lock_exclusive_on_table(Transaction* txn, int tab_fd) {
-    
-    return true;
+    return addLockOnTable(txn, tab_fd, 2);
 }
 
 /**
@@ -63,7 +59,6 @@ bool LockManager::lock_exclusive_on_table(Transaction* txn, int tab_fd) {
  * @param {int} tab_fd 目标表的fd
  */
 bool LockManager::lock_IS_on_table(Transaction* txn, int tab_fd) {
-    
     return true;
 }
 
@@ -74,8 +69,7 @@ bool LockManager::lock_IS_on_table(Transaction* txn, int tab_fd) {
  * @param {int} tab_fd 目标表的fd
  */
 bool LockManager::lock_IX_on_table(Transaction* txn, int tab_fd) {
-    
-    return true;
+    return addLockOnTable(txn, tab_fd, 3);
 }
 
 /**
@@ -85,6 +79,66 @@ bool LockManager::lock_IX_on_table(Transaction* txn, int tab_fd) {
  * @param {LockDataId} lock_data_id 要释放的锁ID
  */
 bool LockManager::unlock(Transaction* txn, LockDataId lock_data_id) {
-   
+    checkAndSetState(txn, true);
+
+    LockRequestQueue* lock_request_queue = &lock_table_[lock_data_id];
+//    auto it = lock_request_queue->request_queue_.begin();
+    for (auto it = lock_request_queue->request_queue_.begin(); it != lock_request_queue->request_queue_.end(); ++it) {
+        if (it->txn_id_ == txn->get_transaction_id()) {
+            switch (it->lock_mode_) {
+                case LockMode::SHARED:
+                    lock_request_queue->shared_lock_num_--;
+                    break;
+                case LockMode::INTENTION_EXCLUSIVE:
+                    lock_request_queue->IX_lock_num_--;
+                    break;
+                case LockMode::S_IX:
+                    lock_request_queue->shared_lock_num_--;
+                    lock_request_queue->IX_lock_num_--;
+                    break;
+                default:
+                    break;
+            }
+            lock_request_queue->request_queue_.erase(it);
+            break;
+        }
+    }
+
+    // 确定queue中级别最大的锁，赋值group_lock_mode_
+    // 分对对应X, SIX, S, IX, IS
+    bool level[6] = {0, 0, 0, 0, 0, 0};
+    for (auto iter : lock_request_queue->request_queue_) {
+        switch (iter.lock_mode_) {
+            case LockMode::SHARED:
+                level[2] = true;
+                break;
+            case LockMode::EXLUCSIVE:
+                level[0] = true;
+                break;
+            case LockMode::INTENTION_SHARED:
+                level[5] = true;
+                break;
+            case LockMode::INTENTION_EXCLUSIVE:
+                level[4] = true;
+                break;
+            case LockMode::S_IX:
+                level[1] = true;
+                break;
+        }
+    }
+
+    if (level[0]) {
+        lock_request_queue->group_lock_mode_ = GroupLockMode::X;
+    } else if (level[1]) {
+        lock_request_queue->group_lock_mode_ = GroupLockMode::SIX;
+    } else if (level[2]) {
+        lock_request_queue->group_lock_mode_ = GroupLockMode::S;
+    } else if (level[3]) {
+        lock_request_queue->group_lock_mode_ = GroupLockMode::IX;
+    } else if (level[4]) {
+        lock_request_queue->group_lock_mode_ = GroupLockMode::IS;
+    } else {
+        lock_request_queue->group_lock_mode_ = GroupLockMode::NON_LOCK;
+    }
     return true;
 }
